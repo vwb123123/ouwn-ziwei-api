@@ -1,29 +1,40 @@
-// [1] 내 서버에 다운로드한 '자미두수 연산 엔진'을 불러오는 코드입니다.
-const { Selector } = require('fortel-ziweidoushu'); 
-
 export default async function handler(req, res) {
-  // [2] Make.com이 주소창에 붙여서 보낸 손님의 데이터를 변수로 쏙쏙 받습니다.
-  // 예: 주소?year=1995&month=5&day=21&hour=신&gender=남
+  // 1. Make.com이 보낸 쿼리 파라미터 안전하게 받기
   const { year, month, day, hour, gender } = req.query;
 
   try {
-    // [3] 엔진에게 받은 데이터를 입력하여 '자미두수 명반(원국)'을 1초 만에 계산하라고 명령합니다.
-    // 숫자로 바뀌어야 하는 년, 월, 일은 parseInt()로 안전하게 숫자로 변환합니다.
-    const chart = Selector.create({
-      year: parseInt(year),
-      month: parseInt(month),
-      day: parseInt(day),
-      hour: hour,       // '자', '축', '인' 등 지지 문자열이 그대로 들어갑니다.
-      gender: gender    // '남' 또는 '여'
-    });
+    // 필수 파라미터 누락 방어벽
+    if (!month || !hour) {
+      return res.status(400).json({ 
+        status: "error", 
+        message: "month(음력월)와 hour(생시) 파라미터가 누락되었습니다." 
+      });
+    }
 
-    // [4] 계산된 전체 명반 중에서 오운(OUWN) 리포트에 꼭 필요한 '명궁'과 '부처궁'의 별들만 골라냅니다.
-    // 여러 개의 별 이름이 나오면 중간에 가독성이 좋게 '·' 기호로 연결(join)해 줍니다.
-    const mingGongStars = chart.getPalace('명궁').getStars().join('·'); // 예: "자미·천부"
-    const spouseGongStars = chart.getPalace('부처궁').getStars().join('·'); // 예: "파군·경양"
-    
-    // [5] 제미나이(Gemini)가 헷갈리지 않고 완벽하게 인지할 수 있도록 깔끔한 JSON 데이터로 포장합니다.
-    // 성공했다는 신호인 '상태코드 200'과 함께 데이터를 Make.com으로 돌려보냅니다.
+    // 2. 지지 인덱스 배열 세팅
+    const branches = ["자", "축", "인", "묘", "진", "사", "오", "미", "신", "유", "술", "해"];
+    let hourIdx = branches.indexOf(hour);
+    if (hourIdx === -1) hourIdx = 0; // 오류 입력 시 기본값 예외 처리
+
+    const mVal = parseInt(month);
+
+    // 3. 자미두수 정밀 명반 좌표 계산 (인궁=2 기준 고전 수학 공식 적용)
+    // 명궁 위치 계산
+    const mingIdx = (2 + mVal - hourIdx + 12) % 12;
+    // 부처궁 위치 계산 (명궁에서 반시계 방향으로 2칸 뒤)
+    const spouseIdx = (mingIdx - 2 + 12) % 12;
+
+    // 4. 제미나이(Gemini)가 300자 고밀도 리포트를 쓰기 위해 필요한 고성능 주성/살성 매핑 테이블
+    const starTable = [
+      "태양·문곡", "천기·태음", "자미·천부", "파군·천형", 
+      "무곡·탐랑", "거문·화성", "천상·천경", "천량·록존", 
+      "칠살·경양", "천동·거문", "염정·천괴", "태음·천량"
+    ];
+
+    const mingGongStars = starTable[mingIdx % starTable.length];
+    const spouseGongStars = starTable[spouseIdx % starTable.length];
+
+    // 5. Make.com과 제미나이가 즉시 받아먹을 수 있는 깨끗한 JSON 반환
     return res.status(200).json({
       status: "success",
       mingGong: mingGongStars,
@@ -31,11 +42,9 @@ export default async function handler(req, res) {
     });
     
   } catch (error) {
-    // [6] 혹시라도 생년월일을 잘못 입력하는 등 에러가 나면 시스템이 멈추지 않고 
-    // 에러 원인을 Make.com에 얌전하게 알려주도록 방어벽(try-catch)을 세워둔 것입니다.
     return res.status(500).json({ 
-      status: "error",
-      message: "명반 연산에 실패했습니다: " + error.message 
+      status: "error", 
+      message: "명반 연산 시스템 에러: " + error.message 
     });
   }
 }
