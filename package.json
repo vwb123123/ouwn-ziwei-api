@@ -1,0 +1,7 @@
+{
+  "name": "ouwn-ziwei-api",
+  "version": "1.0.0",
+  "dependencies": {
+    "fortel-ziweidoushu": "^1.0.4"
+  }
+}
