@@ -1,7 +1,9 @@
 {
   "name": "ouwn-ziwei-api",
-  "version": "1.0.0",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
   "dependencies": {
-    "fortel-ziweidoushu": "^1.0.4"
+    "iztro": "^2.6.0"
   }
 }
