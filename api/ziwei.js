@@ -43,6 +43,20 @@ function starsOf(palace) {
   return major.concat(minor);
 }
 
+// 별이 하나도 없는 궁(공궁)은 자미두수 정석대로 맞은편 궁(대궁)의 별을 빌려옵니다.
+// 그냥 빈 문자열로 내보내면 리포트의 그 페이지가 통째로 비어버립니다.
+function starsOfWithBorrow(chart, palace) {
+  const own = starsOf(palace);
+  if (own.length) return own.join('·');
+  if (!palace) return '';
+  const idx = chart.palaces.indexOf(palace);
+  if (idx < 0) return '';
+  const opp = chart.palaces[(idx + 6) % 12];
+  const borrowed = starsOf(opp);
+  if (!borrowed.length) return '공궁';
+  return '공궁 (대궁 차성: ' + borrowed.join('·') + ')';
+}
+
 // 그 궁의 별 중 하나가 올해(또는 대한) 사화를 맞았는지
 // mutagen 배열은 [록성, 권성, 과성, 기성] 순서입니다.
 function sihuaOf(stars, mutagen) {
@@ -87,9 +101,20 @@ export default async function handler(req, res) {
     }
 
     const dateStr = `${year}-${month}-${day}`;
-    const chart = isLunar
-      ? astro.byLunar(dateStr, timeIndex, gender, false, true, 'ko-KR')
-      : astro.bySolar(dateStr, timeIndex, gender, true, 'ko-KR');
+    let chart;
+    try {
+      chart = isLunar
+        ? astro.byLunar(dateStr, timeIndex, gender, false, true, 'ko-KR')
+        : astro.bySolar(dateStr, timeIndex, gender, true, 'ko-KR');
+    } catch (e) {
+      // 대표적인 경우: 음력 30일을 골랐는데 그 달이 29일까지인 달
+      return res.status(400).json({
+        status: 'error',
+        code: 'INVALID_DATE',
+        message: `명반을 세울 수 없는 날짜입니다 (${isLunar ? '음력' : '양력'} ${dateStr}). ` +
+                 `원인: ${e.message}. 신청서의 생년월일/양력·음력 선택을 확인해 주세요.`,
+      });
+    }
 
     const byName = {};
     chart.palaces.forEach((p) => { byName[p.name] = p; });
@@ -120,7 +145,7 @@ export default async function handler(req, res) {
       sihuaOf(mingStars, hs.decadal && hs.decadal.mutagen) ||
       '';
 
-    const join = (p) => starsOf(p).join('·');
+    const join = (p) => starsOfWithBorrow(chart, p);
 
     return res.status(200).json({
       status: 'success',
